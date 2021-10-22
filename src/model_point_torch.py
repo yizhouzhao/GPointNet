@@ -14,7 +14,7 @@ sys.path.append('./src')
 
 # Main
 import torch 
-import pytorch_lightning as pl 
+#import pytorch_lightning as pl 
 from utils import data_util
 from utils import util_torch
 import numpy as np

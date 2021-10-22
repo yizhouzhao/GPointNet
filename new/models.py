@@ -58,6 +58,8 @@ class NetWrapper(nn.Module):
         self.loss_fun = ChamferDistance()
 
     def sample_langevin_prior_z(self, z, netE, verbose=False):
+        batch_num = z.shape[0]
+
         z = z.clone().detach()
         z.requires_grad = True
         for i in range(e_l_steps):
@@ -71,19 +73,19 @@ class NetWrapper(nn.Module):
             if (i % 5 == 0 or i == e_l_steps - 1) and verbose:
                 print('Langevin prior {:3d}/{:3d}: energy={:8.3f}'.format(i+1, e_l_steps, en.sum().item()))
 
-            z_grad_norm = z_grad.view(batch_size, -1).norm(dim=1).mean()
+            z_grad_norm = z_grad.view(batch_num, -1).norm(dim=1).mean()
 
         return z.detach(), z_grad_norm
 
     def sample_langevin_post_z(self, z, x, netG, netE, verbose=False):
 
-        mse = nn.MSELoss(reduction='sum')
+        batch_num = z.shape[0]
 
         z = z.clone().detach()
         z.requires_grad = True
         for i in range(g_l_steps):
             x_hat = netG(z)
-            print("x_hat.shape", x_hat.shape, x.shape)
+            #print("x_hat.shape", x_hat.shape, x.shape)
             g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * self.loss_fun(x_hat.transpose(1,2), x.transpose(1,2))
             z_grad_g = torch.autograd.grad(g_log_lkhd, z)[0]
 
@@ -97,8 +99,8 @@ class NetWrapper(nn.Module):
             if (i % 5 == 0 or i == g_l_steps - 1) and verbose:
                 print('Langevin posterior {:3d}/{:3d}: MSE={:8.3f}'.format(i+1, g_l_steps, g_log_lkhd.item()))
 
-            z_grad_g_grad_norm = z_grad_g.view(batch_size, -1).norm(dim=1).mean()
-            z_grad_e_grad_norm = z_grad_e.view(batch_size, -1).norm(dim=1).mean()
+            z_grad_g_grad_norm = z_grad_g.view(batch_num, -1).norm(dim=1).mean()
+            z_grad_e_grad_norm = z_grad_e.view(batch_num, -1).norm(dim=1).mean()
 
         return z.detach(), z_grad_g_grad_norm, z_grad_e_grad_norm
 

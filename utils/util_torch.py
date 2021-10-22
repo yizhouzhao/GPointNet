@@ -14,7 +14,7 @@ matplotlib.use('Agg')
 import h5py
 import pickle
 import math
-import pytorch_lightning as pl
+# import pytorch_lightning as pl
 from utils.eulerangles import euler2mat
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D

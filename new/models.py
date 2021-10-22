@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-z_dim = 1024
-point_num = 2048
+from .params import *
+from chamferdist import ChamferDistance
 
 class NetE(nn.Module):
     def __init__(self):
@@ -40,8 +40,74 @@ class NetG(nn.Module):
             nn.Linear(512, 1024),
             f,
 
-            nn.Linear(512, 3*point_num) # output: batch x (3 Point num)
+            nn.Linear(1024, 3*point_num) # output: batch x (3 Point num)
         )
 
     def forward(self, z):
-        x = self.gen(z).view(-1, point_num, 3)
+        x = self.gen(z).view(-1, 3, point_num)
+        return x
+
+
+class NetWrapper(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.netE = NetE()
+        self.netG = NetG()
+
+        self.loss_fun = ChamferDistance()
+
+    def sample_langevin_prior_z(self, z, netE, verbose=False):
+        z = z.clone().detach()
+        z.requires_grad = True
+        for i in range(e_l_steps):
+            en = netE(z)
+            z_grad = torch.autograd.grad(en.sum(), z)[0]
+
+            z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            if e_l_with_noise:
+                z.data += e_l_step_size * torch.randn_like(z).data
+
+            if (i % 5 == 0 or i == e_l_steps - 1) and verbose:
+                print('Langevin prior {:3d}/{:3d}: energy={:8.3f}'.format(i+1, e_l_steps, en.sum().item()))
+
+            z_grad_norm = z_grad.view(batch_size, -1).norm(dim=1).mean()
+
+        return z.detach(), z_grad_norm
+
+    def sample_langevin_post_z(self, z, x, netG, netE, verbose=False):
+
+        mse = nn.MSELoss(reduction='sum')
+
+        z = z.clone().detach()
+        z.requires_grad = True
+        for i in range(g_l_steps):
+            x_hat = netG(z)
+            print("x_hat.shape", x_hat.shape, x.shape)
+            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * self.loss_fun(x_hat.transpose(1,2), x.transpose(1,2))
+            z_grad_g = torch.autograd.grad(g_log_lkhd, z)[0]
+
+            en = netE(z)
+            z_grad_e = torch.autograd.grad(en.sum(), z)[0]
+
+            z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad_g + z_grad_e + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            if g_l_with_noise:
+                z.data += g_l_step_size * torch.randn_like(z).data
+
+            if (i % 5 == 0 or i == g_l_steps - 1) and verbose:
+                print('Langevin posterior {:3d}/{:3d}: MSE={:8.3f}'.format(i+1, g_l_steps, g_log_lkhd.item()))
+
+            z_grad_g_grad_norm = z_grad_g.view(batch_size, -1).norm(dim=1).mean()
+            z_grad_e_grad_norm = z_grad_e.view(batch_size, -1).norm(dim=1).mean()
+
+        return z.detach(), z_grad_g_grad_norm, z_grad_e_grad_norm
+
+    def forward(self, z, x=None, prior=True):
+        # print('z', z.shape)
+        # if x is not None:
+        #    print('x', x.shape)
+
+        if prior:
+            return self.sample_langevin_prior_z(z, self.netE)[0]
+        else:
+            return self.sample_langevin_post_z(z, x, self.netG, self.netE)[0]

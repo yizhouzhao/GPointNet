@@ -243,7 +243,7 @@ def parse_config():
     parser.add_argument('-output_dir', type=str, default="default")
     parser.add_argument('-fp16', type=str, default="None", help='/O1/O2')
     
-    return parser.parse_args()
+    return parser.parse_args("")
 
 def main(opt):
 

@@ -1,3 +1,28 @@
+# PointFly to do (10/22/2021)
+
+## 1.check evaluation metrics
+
+(Jianwen) Section 4.1
+
+overall or single category
+
+## 2. reconstruction and generation (check task)
+
+## 3. Model num (10?)
+
+# Parameter tunning
+
+## 1. hidden dimension
+
+## 2. network structure
+
+Autoencoder point generator (uptodate models)
+
+
+
+
+
+
 # Generative PointNet: Deep Energy-Based Learning on Unordered Point Sets for 3D Generation, Reconstruction and Classification
 
 This repository contains the official pytorch implementation for the paper "Generative PointNet: Deep Energy-Based Learning on Unordered Point Sets for 3D Generation, Reconstruction and Classification"

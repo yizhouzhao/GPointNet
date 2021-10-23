@@ -1,5 +1,5 @@
 ###################   network    ############################
-z_dim = 100
+z_dim = 100 # may change to 1024
 point_num = 2048
 
 e_l_steps  = 80 # number of langevin steps

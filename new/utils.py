@@ -3,6 +3,7 @@ import  torch.nn.functional as F
 import os
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 
 from .params import *
 
@@ -45,3 +46,32 @@ def energy(score):
 
 def sample_p_0(n=batch_size, sig=e_init_sig, device = torch.device("cuda")):
     return sig * torch.randn(*[n, z_dim]).to(device)
+
+
+def show_point_clouds(point_clouds):
+    num_cols,num_rows = 4, 4
+    idx = None
+    if point_clouds.shape[1] < 10: 
+        point_clouds = np.swapaxes(point_clouds, 1, 2)
+    num_clouds = len(point_clouds)
+    # num_rows = min(num_rows, num_clouds // num_cols + 1)
+
+    fig = plt.figure(figsize=(num_cols * 4, num_rows * 4))
+    for i, pts in enumerate(point_clouds[:num_cols*num_rows]):
+        #print(i)
+        if point_clouds.shape[2] == 3: 
+            ax = plt.subplot(num_rows, num_cols, i+1, projection='3d')
+            plt.subplots_adjust(0,0,1,1,0,0)
+            #ax.axis('off')
+            if idx is not None:
+                ax.set_title(str(idx[i]))
+            ax.scatter(pts[:,0], pts[:,2], pts[:,1], marker='.', s=50, c=pts[:,2], cmap=plt.get_cmap('gist_rainbow'))
+        else: 
+            ax = plt.subplot(num_rows, num_cols, i+1)
+            plt.subplots_adjust(0,0,1,1,0,0)
+            # ax.axis('off')
+            if idx is not None:
+                ax.set_title(str(idx[i]))
+            ax.scatter(pts[:,1], -pts[:,0], marker='.', s=30)
+    
+    plt.show()

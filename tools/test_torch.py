@@ -1,7 +1,7 @@
 # 2021.03.01 
 
 # Logistic
-import tqdm 
+# import tqdm 
 import argparse 
 import traceback 
 import datetime
@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
 
 # Main
 import torch 
-import pytorch_lightning as pl 
+# import pytorch_lightning as pl 
 from utils import data_util
 from utils import util_torch
 import numpy as np

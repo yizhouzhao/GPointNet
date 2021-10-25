@@ -329,6 +329,10 @@ class PointCloudDataCollator(object):
         out_pcd = []
         for pcd in pcds: 
             if self.random_sample:
+                # print("PointCloudDataCollator random permutation ?")
+                # if np.random.rand() < 0.5:
+                #     pcd = -pcd
+
                 if len(pcd) >= self.num_point: 
                     idx = np.random.permutation(len(pcd))[:self.num_point]
                 else:

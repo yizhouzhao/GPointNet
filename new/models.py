@@ -78,7 +78,7 @@ class NetWrapper(nn.Module):
 
         # cd = torch.mean(dl + dr)
 
-        cd = self.chamfer_loss(x, y)
+        cd = self.chamfer_loss(x, y) / point_num
         return cd
 
     def sample_langevin_prior_z(self, z, netE, verbose=False):

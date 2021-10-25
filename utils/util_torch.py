@@ -324,10 +324,15 @@ class PointCloudDataCollator(object):
         self.swap_axis = config.swap_axis
         self.normalize = config.normalize
 
-    def __call__(self, pcds):
-
+    def __call__(self, pcds):    
         out_pcd = []
         for pcd in pcds: 
+            # print("pcd", pcd is tuple, len(pcd))
+            if type(pcd) is tuple and len(pcd) == 2:
+                #print("pcd tuple")
+                pcd = pcd[0]
+                pcd = torch.from_numpy(pcd)
+            
             if self.random_sample:
                 # print("PointCloudDataCollator random permutation ?")
                 # if np.random.rand() < 0.5:

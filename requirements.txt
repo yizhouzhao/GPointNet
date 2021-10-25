@@ -1,6 +1,7 @@
-torch==1.10
 scipy
 scikit-learn
 matplotlib
 tensorboard
 h5py
+pandas
+tqdm

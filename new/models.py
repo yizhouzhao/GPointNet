@@ -3,7 +3,8 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from .params import *
-from metrics.evaluation_metrics import distChamferCUDA, distChamfer
+from new.champfer_loss import ChamferLoss
+# from metrics.evaluation_metrics import distChamferCUDA, distChamfer
 
 class NetE(nn.Module):
     def __init__(self):
@@ -67,13 +68,17 @@ class NetWrapper(nn.Module):
         self.netE = NetE()
         self.netG = NetG()
 
-    def loss_fun(self, x:torch.Tensor, y:torch.Tensor, loss_type = "chamfer distance"):
-        if x.is_cuda:
-            dl, dr = distChamferCUDA(x, y)
-        else:
-            dl, dr = distChamfer(x, y)
+        self.chamfer_loss = ChamferLoss()
 
-        cd = torch.mean(dl + dr)
+    def loss_fun(self, x:torch.Tensor, y:torch.Tensor, loss_type = "chamfer distance"):
+        # if x.is_cuda:
+        #     dl, dr = distChamferCUDA(x, y)
+        # else:
+        #     dl, dr = distChamfer(x, y)
+
+        # cd = torch.mean(dl + dr)
+
+        cd = self.chamfer_loss(x, y)
         return cd
 
     def sample_langevin_prior_z(self, z, netE, verbose=False):

@@ -31,7 +31,7 @@ e_gamma = 0.998 # lr decay for ebm
 g_gamma = 0.998 # lr decay for gen
 
 e_init_sig = 1 # sigma of initial distribution
-
+g_init_sig = 1
 
 ################# Log ###################
 n_printout = 25 # print every

@@ -43,16 +43,16 @@ class NetG(nn.Module):
         self.use_bias = True
         self.gen = nn.Sequential(
             nn.Linear(in_features=self.z_size, out_features=64, bias=self.use_bias),
-            nn.GELU(),
+            nn.ReLU(),
 
             nn.Linear(in_features=64, out_features=128, bias=self.use_bias),
-            nn.GELU(),
+            nn.ReLU(),
 
             nn.Linear(in_features=128, out_features=512, bias=self.use_bias),
-            nn.GELU(),
+            nn.ReLU(),
 
             nn.Linear(in_features=512, out_features=1024, bias=self.use_bias),
-            nn.GELU(),
+            nn.ReLU(),
 
             nn.Linear(in_features=1024, out_features=2048 * 3, bias=self.use_bias),
         )
@@ -78,7 +78,7 @@ class NetWrapper(nn.Module):
 
         # cd = torch.mean(dl + dr)
 
-        cd = self.chamfer_loss(x, y) / point_num
+        cd = self.chamfer_loss(x, y) / x.shape[0]
         return cd
 
     def sample_langevin_prior_z(self, z, netE, verbose=False):

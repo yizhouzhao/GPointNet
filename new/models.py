@@ -108,7 +108,7 @@ class NetWrapper(nn.Module):
         for i in range(g_l_steps):
             x_hat = netG(z)
             # print("x_hat.shape", x_hat.shape, x.shape)
-            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * self.loss_fun(x_hat.transpose(1,2).contiguous(), x.transpose(1,2).contiguous())
+            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * self.loss_fun(x_hat.transpose(1,2).contiguous() + 0.5, x.transpose(1,2).contiguous() + 0.5)
             z_grad_g = torch.autograd.grad(g_log_lkhd, z)[0]
 
             en = netE(z)

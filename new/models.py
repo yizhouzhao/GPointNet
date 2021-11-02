@@ -26,15 +26,6 @@ class NetE(nn.Module):
         return self.ebm(z.squeeze())
 
 
-class Generator(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-    def forward(self, input):
-        output = self.model(input.squeeze())
-        output = output.view(-1, 3, 2048)
-        return output
-
 class NetG(nn.Module):
     def __init__(self):
         super().__init__()
@@ -78,7 +69,7 @@ class NetWrapper(nn.Module):
 
         # cd = torch.mean(dl + dr)
 
-        cd = self.chamfer_loss(x, y) / x.shape[0]
+        cd = self.chamfer_loss(x, y) / 2048
         return cd
 
     def sample_langevin_prior_z(self, z, netE, verbose=False):
@@ -89,13 +80,20 @@ class NetWrapper(nn.Module):
         for i in range(e_l_steps):
             en = netE(z)
             z_grad = torch.autograd.grad(en.sum(), z)[0]
+            
+            channel_alpha = - e_alpha * 0.5 * e_l_step_size * e_l_step_size * z_grad
+            channel_beta = - e_beta * 0.5 * e_l_step_size * e_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
 
-            z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            # z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            channel_gamma = 0.0
             if e_l_with_noise:
-                z.data += e_l_step_size * torch.randn_like(z).data
+                channel_gamma = e_gamma * e_l_step_size * torch.randn_like(z).data
+            
+            z.data += channel_alpha + channel_beta + channel_gamma
 
-            if (i % 5 == 0 or i == e_l_steps - 1) and verbose:
-                print('Langevin prior {:3d}/{:3d}: energy={:8.3f}'.format(i+1, e_l_steps, en.sum().item()))
+            if (i % 10 == 0 or i == e_l_steps - 1) and verbose:
+                print('Langevin prior {:3d}/{:3d}: energy={:8.3f} z_norm:{:8.3f} z_grad_norm:{:8.3f}'.format(i+1, e_l_steps, en.sum().item(), 
+                    torch.mean(torch.linalg.norm(z, dim = 1)).item(), torch.mean(torch.linalg.norm(z_grad, dim = 1)).item()))
 
             z_grad_norm = z_grad.view(batch_num, -1).norm(dim=1).mean()
 
@@ -116,27 +114,37 @@ class NetWrapper(nn.Module):
             en = netE(z)
             z_grad_e = torch.autograd.grad(en.sum(), z)[0]
 
-            z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad_g + z_grad_e + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
-            if g_l_with_noise:
-                z.data += g_l_step_size * torch.randn_like(z).data
+            channel_alpha = - g_alpha * 0.5 * g_l_step_size * g_l_step_size * z_grad_e
+            channel_beta = - g_beta * 0.5 * g_l_step_size * g_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
 
-            if (i % 5 == 0 or i == g_l_steps - 1) and verbose:
-                print('Langevin posterior {:3d}/{:3d}: MSE={:8.3f}'.format(i+1, g_l_steps, g_log_lkhd.item()))
+            channel_gamma = 0.0 
+            channel_delta = - g_delta * 0.5 * g_l_step_size * g_l_step_size * z_grad_g
+    
+            # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad_g + z_grad_e + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            if g_l_with_noise:
+                channel_gamma += g_gamma * g_l_step_size * torch.randn_like(z).data
+
+            z.data += channel_alpha + channel_beta + channel_gamma + channel_delta
+
+
+            if (i % 10 == 0 or i == g_l_steps - 1) and verbose:
+                print('Langevin posterior {:3d}/{:3d}: LOSS G={:8.3f} z_norm:{:8.3f}'.format(i+1, g_l_steps, g_log_lkhd.item(),
+                    torch.mean(torch.linalg.norm(z, dim = 1)).item()))
 
             z_grad_g_grad_norm = z_grad_g.view(batch_num, -1).norm(dim=1).mean()
             z_grad_e_grad_norm = z_grad_e.view(batch_num, -1).norm(dim=1).mean()
 
         return z.detach(), z_grad_g_grad_norm, z_grad_e_grad_norm
 
-    def forward(self, z, x=None, prior=True):
+    def forward(self, z, x=None, prior=True, verbose = False):
         # print('z', z.shape)
         # if x is not None:
         #    print('x', x.shape)
 
         if prior:
-            return self.sample_langevin_prior_z(z, self.netE)[0]
+            return self.sample_langevin_prior_z(z, self.netE, verbose=verbose)[0]
         else:
-            return self.sample_langevin_post_z(z, x, self.netG, self.netE)[0]
+            return self.sample_langevin_post_z(z, x, self.netG, self.netE, verbose=verbose)[0]
 
     def sample_x(self, n:int, sig=e_init_sig, device = torch.device("cuda")):
         z_0 = sig * torch.randn(*[n, z_dim]).to(device)

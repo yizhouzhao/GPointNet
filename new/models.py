@@ -195,6 +195,7 @@ class Encoder(nn.Module):
         return eps.mul(std).add_(mu)
 
     def forward(self, x):
+        # print("input shape", x.shape)
         output = self.conv(x)
         output2 = output.max(dim=2)[0]
         logit = self.fc(output2)
@@ -203,3 +204,65 @@ class Encoder(nn.Module):
         z = self.reparameterize(mu, logvar)
         return z, mu, logvar
 
+
+class LangevinEncoderDecoder(nn.Module):
+    def __init__(self, encoder, decoder) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+        self.chamfer_loss = ChamferLoss()
+
+    def loss_fun(self, x:torch.Tensor, y:torch.Tensor, loss_type = "chamfer distance"):
+        # if x.is_cuda:
+        #     dl, dr = distChamferCUDA(x, y)
+        # else:
+        #     dl, dr = distChamfer(x, y)
+
+        # cd = torch.mean(dl + dr)
+
+        cd = self.chamfer_loss(x, y) 
+        return torch.mean(cd)
+
+    def reparameterize(self, x, mu, logvar, use_lagivine = True, verbose = False):
+        if not use_lagivine:
+            std = torch.exp(0.5*logvar)
+            eps = torch.randn_like(std)
+            return eps.mul(std).add_(mu)
+        
+        z = mu
+        batch_num = z.shape[0]
+        z = z.clone().detach()
+        z.requires_grad = True
+
+        # print("hidden shape", z.shape)
+        for i in range(g_l_steps):
+            x_hat = self.decoder(z)
+            # print("x_hat.shape", x_hat.shape, x.shape)
+            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * self.loss_fun(x_hat.transpose(1,2).contiguous() + 0.5, x.transpose(1,2).contiguous() + 0.5)
+            z_grad_g = torch.autograd.grad(g_log_lkhd, z)[0]
+
+            # en = netE(z)
+            # z_grad_e = torch.autograd.grad(en.sum(), z)[0]
+
+            channel_alpha = 0 # - g_alpha * 0.5 * g_l_step_size * g_l_step_size * z_grad_e
+            channel_beta = - g_beta * 0.5 * g_l_step_size * g_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
+
+            channel_gamma = 0.0 
+            channel_delta = - g_delta * 0.5 * g_l_step_size * g_l_step_size * z_grad_g
+    
+            # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad_g + z_grad_e + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            if g_l_with_noise:
+                channel_gamma += g_gamma * g_l_step_size * torch.randn_like(z).data
+
+            z.data += channel_alpha + channel_beta + channel_gamma + channel_delta
+
+
+            if (i % 10 == 0 or i == g_l_steps - 1) and verbose:
+                print('Langevin posterior {:3d}/{:3d}: LOSS G={:8.3f} z_norm:{:8.3f}'.format(i+1, g_l_steps, g_log_lkhd.item(),
+                    torch.mean(torch.linalg.norm(z, dim = 1)).item()))
+
+            # z_grad_g_grad_norm = z_grad_g.view(batch_num, -1).norm(dim=1).mean()
+            # z_grad_e_grad_norm = z_grad_e.view(batch_num, -1).norm(dim=1).mean()
+
+        return z.detach() #, z_grad_g_grad_norm, z_grad_e_grad_norm

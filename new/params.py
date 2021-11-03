@@ -11,9 +11,9 @@ e_decay = 0
 e_beta1 = 0.05
 e_beta2 = 0.999
 
-g_l_steps = 40 # number of langevin steps
+g_l_steps = 10 # number of langevin steps
 g_llhd_sigma = 0.3 # prior of factor analysis
-g_l_step_size = 0.5 # stepsize of langevin
+g_l_step_size = 0.05 # stepsize of langevin
 g_l_with_noise = True # noise term of langevin
 g_decay = 0
 g_beta1 = 0.5
@@ -48,3 +48,5 @@ g_alpha = 1.0
 g_beta = 0.1
 g_gamma = 0.1
 g_delta = 1.0
+
+

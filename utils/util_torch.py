@@ -14,7 +14,7 @@ matplotlib.use('Agg')
 import h5py
 import pickle
 import math
-import pytorch_lightning as pl
+# import pytorch_lightning as pl
 from utils.eulerangles import euler2mat
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
@@ -324,11 +324,20 @@ class PointCloudDataCollator(object):
         self.swap_axis = config.swap_axis
         self.normalize = config.normalize
 
-    def __call__(self, pcds):
-
+    def __call__(self, pcds):    
         out_pcd = []
         for pcd in pcds: 
+            # print("pcd", pcd is tuple, len(pcd))
+            if type(pcd) is tuple and len(pcd) == 2:
+                #print("pcd tuple")
+                pcd = pcd[0]
+                pcd = torch.from_numpy(pcd)
+            
             if self.random_sample:
+                # print("PointCloudDataCollator random permutation ?")
+                # if np.random.rand() < 0.5:
+                #     pcd = -pcd
+
                 if len(pcd) >= self.num_point: 
                     idx = np.random.permutation(len(pcd))[:self.num_point]
                 else:

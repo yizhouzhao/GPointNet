@@ -2,8 +2,8 @@
 z_dim = 128 # may change to 1024
 point_num = 2048
 
-e_l_steps  = 80 # number of langevin steps
-e_l_step_size = 0.1 # stepsize of langevin
+e_l_steps  = 30 # number of langevin steps
+e_l_step_size = 0.05 # stepsize of langevin
 e_prior_sig = 1.0 # prior of ebm z
 e_l_with_noise = True # noise term of langevin
 e_energy_form = "identity"
@@ -42,11 +42,11 @@ langevin_clip = 1.0
 ################# Channel ####################
 e_alpha = 1.0
 e_beta = 0.1
-e_gamma = 0.1
+e_gamma = 0.01
 
 g_alpha = 1.0
 g_beta = 0.1
-g_gamma = 0.1
+g_gamma = 0.01
 g_delta = 1.0
 
 

@@ -206,9 +206,10 @@ class Encoder(nn.Module):
 
 
 class LangevinEncoderDecoder(nn.Module):
-    def __init__(self, encoder, decoder) -> None:
+    def __init__(self, encoder, decoder, ebm = None) -> None:
         super().__init__()
         self.encoder = encoder
+        self.ebm = ebm
         self.decoder = decoder
 
         self.chamfer_loss = ChamferLoss()
@@ -224,7 +225,32 @@ class LangevinEncoderDecoder(nn.Module):
         cd = self.chamfer_loss(x, y) 
         return torch.mean(cd)
 
-    def reparameterize(self, x, mu, logvar, use_lagivine = True, verbose = False):
+    def prior(self, z, verbose=False):
+        z = z.clone().detach()
+        z.requires_grad = True
+        for i in range(e_l_steps):
+            en = self.ebm(z)
+            z_grad = torch.autograd.grad(en.sum(), z)[0]
+            
+            channel_alpha = - e_alpha * 0.5 * e_l_step_size * e_l_step_size * z_grad
+            channel_beta = - e_beta * 0.5 * e_l_step_size * e_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
+
+            # z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+            channel_gamma = 0.0
+            if e_l_with_noise:
+                channel_gamma = e_gamma * e_l_step_size * torch.randn_like(z).data
+            
+            z.data += channel_alpha + channel_beta + channel_gamma
+
+            if (i % 10 == 0 or i == e_l_steps - 1) and verbose:
+                print('Langevin prior {:3d}/{:3d}: energy={:8.3f} z_norm:{:8.3f} z_grad_norm:{:8.3f}'.format(i+1, e_l_steps, en.sum().item(), 
+                    torch.mean(torch.linalg.norm(z, dim = 1)).item(), torch.mean(torch.linalg.norm(z_grad, dim = 1)).item()))
+
+            # z_grad_norm = z_grad.view(batch_num, -1).norm(dim=1).mean()
+
+        return z.detach()
+
+    def posterior(self, x, mu, logvar, use_lagivine = True, verbose = False):
         if not use_lagivine:
             std = torch.exp(0.5*logvar)
             eps = torch.randn_like(std)
@@ -245,7 +271,7 @@ class LangevinEncoderDecoder(nn.Module):
             # en = netE(z)
             # z_grad_e = torch.autograd.grad(en.sum(), z)[0]
 
-            channel_alpha = 0 # - g_alpha * 0.5 * g_l_step_size * g_l_step_size * z_grad_e
+            
             channel_beta = - g_beta * 0.5 * g_l_step_size * g_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
 
             channel_gamma = 0.0 
@@ -254,8 +280,8 @@ class LangevinEncoderDecoder(nn.Module):
             # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad_g + z_grad_e + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
             if g_l_with_noise:
                 channel_gamma += g_gamma * g_l_step_size * torch.randn_like(z).data
-
-            z.data += channel_alpha + channel_beta + channel_gamma + channel_delta
+    
+            z.data +=  channel_beta + channel_gamma + channel_delta
 
 
             if (i % 10 == 0 or i == g_l_steps - 1) and verbose:

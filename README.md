@@ -85,6 +85,8 @@ Add `-reconstruction`, `-intepolation` to perform reconstruction and intepolatio
 
 ```
 python tools/test_torch.py -category chair -checkpoint_path {path}.ckpt -synthesis -evaluate -reconstruction -intepolation
+python tools/test_torch.py -category chair -checkpoint_path checkpoint/syn_cvpr_chair.ckpt -synthesis -evaluation -reconstruction -intepolation
+
 ```
 
 ### Do classification 

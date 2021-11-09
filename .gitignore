@@ -136,3 +136,5 @@ shapenet/
 results/
 
 Pytorch-EMDLoss/
+
+checkpoint/

@@ -166,17 +166,17 @@ for epoch in range(400):
         loss_kld = -0.5 * torch.mean(
             1 - 2.0 * torch.log(std_assumed) + logvar -
             (mu.pow(2) + logvar.exp()) / torch.pow(std_assumed, 2))
+        
+        # langivine
+        z = e_init_sig * torch.randn(*[batch_num, z_dim]).to(device)
+        z = prior(z)
 
         # VAE
-        loss_eg = loss_e + loss_kld
+        loss_eg = loss_e + loss_kld + 0.01 * torch.mean(M(codes))
         EG_optim.zero_grad()
         loss_eg.backward()
         total_loss += loss_eg.item()
         EG_optim.step()
-
-        # langivine
-        z = e_init_sig * torch.randn(*[batch_num, z_dim]).to(device)
-        z = prior(z)
 
         loss_M = - torch.mean(M(z) - M(codes).detach())
 

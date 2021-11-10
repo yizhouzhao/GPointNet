@@ -11,6 +11,7 @@ import random
 from datetime import datetime
 from importlib import import_module
 from itertools import chain
+import os
 from os.path import join, exists
 
 import matplotlib.pyplot as plt
@@ -107,8 +108,32 @@ optim_M = torch.optim.Adam(M.parameters(),
 from new.champfer_loss import ChamferLoss
 reconstruction_loss = ChamferLoss().to(device)
 
-total_step = 0
+def prior(z):
+    z = z.clone().detach()
+    z.requires_grad = True
+    for _ in range(e_l_steps):
+        en = M(z)
+        z_grad = torch.autograd.grad(en.sum(), z)[0]
+        
+        channel_alpha = - e_alpha * 0.5 * e_l_step_size * e_l_step_size * z_grad
+        channel_beta = - e_beta * 0.5 * e_l_step_size * e_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
 
+        # z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
+        channel_gamma = 0.0
+        if e_l_with_noise:
+            channel_gamma = e_gamma * e_l_step_size * torch.randn_like(z).data
+        
+        z.data += channel_alpha + channel_beta + channel_gamma
+
+        if (i % 10 == 0 or i == e_l_steps - 1) and False:
+            print('Langevin prior {:3d}/{:3d}: energy={:8.3f} z_norm:{:8.3f} z_grad_norm:{:8.3f}'.format(i+1, e_l_steps, en.sum().item(), 
+                torch.mean(torch.linalg.norm(z, dim = 1)).item(), torch.mean(torch.linalg.norm(z_grad, dim = 1)).item()))
+
+    z = z.detach()
+
+    return z
+
+total_step = 0
 for epoch in range(400):
     start_epoch_time = datetime.now()
     
@@ -151,28 +176,7 @@ for epoch in range(400):
 
         # langivine
         z = e_init_sig * torch.randn(*[batch_num, z_dim]).to(device)
-
-        z = z.clone().detach()
-        z.requires_grad = True
-        for _ in range(e_l_steps):
-            en = M(z)
-            z_grad = torch.autograd.grad(en.sum(), z)[0]
-            
-            channel_alpha = - e_alpha * 0.5 * e_l_step_size * e_l_step_size * z_grad
-            channel_beta = - e_beta * 0.5 * e_l_step_size * e_l_step_size * (1.0 / (e_prior_sig * e_prior_sig) * z.data)
-
-            # z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * (z_grad + 1.0 / (e_prior_sig * e_prior_sig) * z.data)
-            channel_gamma = 0.0
-            if e_l_with_noise:
-                channel_gamma = e_gamma * e_l_step_size * torch.randn_like(z).data
-            
-            z.data += channel_alpha + channel_beta + channel_gamma
-
-            if (i % 10 == 0 or i == e_l_steps - 1) and False:
-                print('Langevin prior {:3d}/{:3d}: energy={:8.3f} z_norm:{:8.3f} z_grad_norm:{:8.3f}'.format(i+1, e_l_steps, en.sum().item(), 
-                    torch.mean(torch.linalg.norm(z, dim = 1)).item(), torch.mean(torch.linalg.norm(z_grad, dim = 1)).item()))
-
-        z = z.detach()
+        z = prior(z)
 
         loss_M = - torch.mean(M(z) - M(codes).detach())
 
@@ -210,11 +214,24 @@ for epoch in range(400):
 
     G.eval()
     E.eval()
-    with torch.no_grad():
-        fake = G(fixed_noise).data.cpu().numpy()
-        codes, _, _ = E(X)
-        X_rec = G(codes).data.cpu().numpy()
-        X = X.data.cpu().numpy()
+    M.eval()
+
+    if not exists(results_dir):     
+        os.mkdir(results_dir)
+
+    if not exists(join(results_dir, 'samples')):        
+        os.mkdir(join(results_dir, 'samples'))
+
+    
+    fake = G(fixed_noise).data.cpu().numpy()
+    codes, _, _ = E(X)
+    X_rec = G(codes).data.cpu().numpy()
+    X = X.data.cpu().numpy()
+
+    # langivine
+    z = e_init_sig * torch.randn(*[batch_num, z_dim]).to(device)
+    z = prior(z)
+    X_sample = G(z).data.cpu().numpy()
 
     for k in range(5):
         fig = plot_3d_point_cloud(X[k][0], X[k][1], X[k][2],
@@ -238,4 +255,13 @@ for epoch in range(400):
                                   in_u_sphere=True, show=False)
         fig.savefig(join(results_dir, 'samples',
                          f'{epoch}_{k}_reconstructed.png'))
+        plt.close(fig)
+    
+    for k in range(5):
+        fig = plot_3d_point_cloud(X_sample[k][0],
+                                  X_sample[k][1],
+                                  X_sample[k][2],
+                                  in_u_sphere=True, show=False)
+        fig.savefig(join(results_dir, 'samples',
+                         f'{epoch}_{k}_prior_sample.png'))
         plt.close(fig)
